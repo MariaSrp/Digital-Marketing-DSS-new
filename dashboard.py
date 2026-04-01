@@ -13,13 +13,9 @@ st.subheader("Live marketing data (simulation)")
 EXCEL_FILE = "live_marketing_data.xlsx"
 
 # =======================
-# 0) LOAD + DEBUG OUTPUT
+# LOAD DATA
 # =======================
 df = pd.read_excel(EXCEL_FILE)
-
-st.write("DEBUG – columns:", list(df.columns))
-st.write("DEBUG – number of rows:", len(df))
-st.dataframe(df.head())
 
 # =======================
 # CLEANING & KPIs
@@ -85,71 +81,45 @@ if "ROAS" in df.columns and not df.empty:
         view_cols = [c for c in view_cols if c in base_df.columns]
         view_df = base_df[view_cols].copy()
 
-        # Action columns
-        view_df["Pause"] = False
-        view_df["Reduce_50"] = False
-
-        # ROAS color labels as extra column (used by CSS)
-        def roas_bucket(val):
+        # ---------- COLORED READ‑ONLY TABLE ----------
+        def roas_color(val):
             if pd.isna(val):
                 return ""
             if val < 1:
-                return "roas-red"
+                return "background-color: #ffcccc"   # red
             elif val < 2:
-                return "roas-yellow"
+                return "background-color: #fff3cd"   # yellow
             else:
-                return "roas-green"
+                return "background-color: #d4edda"   # green
 
-        view_df["_roas_color"] = view_df["ROAS"].apply(roas_bucket)
+        st.write("ROAS alerts (colored view):")
+        colored_view = view_df.style.map(roas_color, subset=["ROAS"])
+        st.dataframe(colored_view, use_container_width=True, height=260)
 
-        st.write("Campaigns (scroll inside the table):")
+        # ---------- EDITABLE TABLE FOR ACTIONS ----------
+        st.write("Select actions for campaigns:")
 
-        # Inject CSS once: classes used to color ROAS cells
-        st.markdown(
-            """
-            <style>
-            td[data-testid="stStyledDataFrameCell"] div:has(span.roas-red)   { background-color: #ffcccc !important; }
-            td[data-testid="stStyledDataFrameCell"] div:has(span.roas-yellow){ background-color: #fff3cd !important; }
-            td[data-testid="stStyledDataFrameCell"] div:has(span.roas-green) { background-color: #d4edda !important; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Convert ROAS to string with span carrying the color class
-        def roas_with_span(row):
-            val = row["ROAS"]
-            cls = row["_roas_color"]
-            if pd.isna(val) or cls == "":
-                return ""
-            return f'<span class="{cls}">{val:.3f}</span>'
-
-        # Create a display column for ROAS with HTML span
-        view_df["ROAS_display"] = view_df.apply(roas_with_span, axis=1)
-
-        # Editor DataFrame: use ROAS_display for viewing, keep original ROAS numeric
-        editor_df = view_df.copy()
+        editable_df = view_df.copy()
+        editable_df["Pause"] = False
+        editable_df["Reduce_50"] = False
 
         edited_df = st.data_editor(
-            editor_df,
+            editable_df,
             height=400,
             column_config={
-                "ROAS_display": st.column_config.Column("ROAS"),
+                "ROAS": st.column_config.NumberColumn("ROAS", format="%.3f"),
                 "Pause": st.column_config.CheckboxColumn("Pause"),
                 "Reduce_50": st.column_config.CheckboxColumn("-50%"),
-                "_roas_color": None,  # hide helper column
-                "ROAS": None,         # hide raw numeric ROAS (we show ROAS_display)
             },
             disabled=[
                 "campaign_name",
                 "category",
                 "mark_spent",
                 "revenue",
-                "ROAS_display",
+                "ROAS",
                 "recommended_action",
                 "status",
             ],
-            hide_index=True,
             use_container_width=True,
         )
 
