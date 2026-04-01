@@ -12,10 +12,10 @@ st.subheader("Live marketing data (simulation)")
 
 EXCEL_FILE = "live_marketing_data.xlsx"
 
-# LOAD DATA
+# ============ LOAD DATA ============
 df = pd.read_excel(EXCEL_FILE)
 
-# CLEANING & KPIs
+# ============ CLEANING & KPIs ============
 if "campaign_name" in df.columns:
     df = df.dropna(subset=["campaign_name"])
 
@@ -47,10 +47,8 @@ if "ROAS" in df.columns:
 if "c_date" in df.columns and not df.empty:
     df = df.sort_values("c_date")
 
-# ==========================
-# 1) ROAS alerts – ONE COLORED TABLE
-# ==========================
-st.subheader("ROAS alerts")
+# ============ 1) ONE TABLE: ROAS + CHECKBOXES ============
+st.subheader("ROAS alerts (one table)")
 
 if "ROAS" in df.columns and not df.empty:
     base_df = df.copy().sort_values("ROAS")
@@ -67,64 +65,81 @@ if "ROAS" in df.columns and not df.empty:
     view_cols = [c for c in view_cols if c in base_df.columns]
     view_df = base_df[view_cols].copy()
 
+    # Add checkbox columns
+    view_df["Pause"] = False
+    view_df["Reduce_50"] = False
+
+    # Style ROAS colors - ROAS will be disabled (read-only) in editor
     def roas_color(val):
         if pd.isna(val):
             return ""
         if val < 1:
-            return "background-color: #ffcccc"   # red
+            return "background-color: #ffcccc"    # red
         elif val < 2:
-            return "background-color: #fff3cd"   # yellow
+            return "background-color: #fff3cd"    # yellow
         else:
-            return "background-color: #d4edda"   # green
+            return "background-color: #d4edda"    # green"
 
     styled_view = view_df.style.map(roas_color, subset=["ROAS"])
 
-    st.write("Campaigns (one table, ROAS with colors):")
-    st.dataframe(styled_view, use_container_width=True, height=420)
-
-    # Simple action controls below the table
-    st.write("Select a campaign and apply an action:")
-
-    campaign_list = base_df["campaign_name"].dropna().astype(str).unique()
-    selected_campaign = st.selectbox("Campaign:", sorted(campaign_list))
-
-    action = st.selectbox(
-        "Action:",
-        ["No action", "Pause campaign", "Reduce budget -50%"],
+    st.write("Edit actions directly in the table, then click 'Apply actions' below.")
+    edited_df = st.data_editor(
+        styled_view,
+        height=420,
+        column_config={
+            "ROAS": st.column_config.NumberColumn("ROAS", format="%.3f"),
+            "Pause": st.column_config.CheckboxColumn("Pause"),
+            "Reduce_50": st.column_config.CheckboxColumn("-50%"),
+        },
+        disabled=[
+            "campaign_name",
+            "category",
+            "mark_spent",
+            "revenue",
+            "ROAS",              # ROAS read-only but colored
+            "recommended_action",
+            "status",
+        ],
+        hide_index=True,
+        use_container_width=True,
+        key="roas_editor",
     )
 
-    if st.button("Apply selected action"):
-        if action == "Pause campaign":
-            df.loc[df["campaign_name"] == selected_campaign, "status"] = "PAUSED_CONFIRMED"
-            st.session_state["action_log"].append(
-                {"campaign": selected_campaign, "action": "pause_confirmed"}
-            )
-            st.success(f"Campaign '{selected_campaign}' paused (simulation).")
-        elif action == "Reduce budget -50%":
-            df.loc[df["campaign_name"] == selected_campaign, "mark_spent"] *= 0.5
-            st.session_state["action_log"].append(
-                {"campaign": selected_campaign, "action": "reduce_budget_50"}
-            )
-            st.success(f"Budget for '{selected_campaign}' reduced by 50% (simulation).")
+    st.write("Apply actions for the selected rows:")
+
+    if st.button("Apply actions"):
+        for _, row in edited_df.iterrows():
+            name = row["campaign_name"]
+
+            if row.get("Pause", False):
+                df.loc[df["campaign_name"] == name, "status"] = "PAUSED_CONFIRMED"
+                st.session_state["action_log"].append(
+                    {"campaign": name, "action": "pause_confirmed"}
+                )
+
+            if row.get("Reduce_50", False):
+                df.loc[df["campaign_name"] == name, "mark_spent"] *= 0.5
+                st.session_state["action_log"].append(
+                    {"campaign": name, "action": "reduce_budget_50"}
+                )
 
         df.to_excel(EXCEL_FILE, index=False)
+        st.success("Actions applied (simulation).")
 else:
-    st.write("ROAS column not found or no rows. Make sure revenue and mark_spent exist and data is not empty.")
+    st.write("ROAS column not found or no rows. Check revenue and mark_spent.")
 
-# ===================
-# 2) Campaign drill-down
-# ===================
+# ============ 2) DRILL-DOWN ============
 st.subheader("Campaign drill-down")
 
 if "campaign_name" in df.columns and not df.empty:
     campaign_list = df["campaign_name"].dropna().astype(str).unique()
-    selected_campaign_dd = st.selectbox(
-        "Choose a campaign to inspect:", sorted(campaign_list), key="drilldown"
+    selected_campaign = st.selectbox(
+        "Choose a campaign to inspect:", sorted(campaign_list)
     )
 
-    camp_df = df[df["campaign_name"] == selected_campaign_dd]
+    camp_df = df[df["campaign_name"] == selected_campaign]
 
-    st.write("Details for:", selected_campaign_dd)
+    st.write("Details for:", selected_campaign)
     cols_to_show = ["c_date", "category", "mark_spent", "revenue", "ROAS", "status"]
     cols_to_show = [c for c in cols_to_show if c in camp_df.columns]
     st.dataframe(camp_df[cols_to_show], height=250)
@@ -138,32 +153,28 @@ if "campaign_name" in df.columns and not df.empty:
     st.metric("Average ROAS", f"{avg_roas:.2f}")
 
     st.subheader("ROAS trend over time")
-
     if "c_date" in camp_df.columns and "ROAS" in camp_df.columns:
         trend = camp_df.sort_values("c_date").set_index("c_date")["ROAS"]
         st.line_chart(trend)
 
-# ===================
-# 3) Alert detail popup (simulation)
-# ===================
+# ============ 3) ALERT DETAIL POPUP (OPTIONAL) ============
 st.markdown("---")
 st.subheader("Alert detail popup (simulation)")
 
 if "ROAS" in df.columns and "campaign_name" in df.columns and not df.empty:
-    camp_df = df[df["campaign_name"] == selected_campaign_dd]
-    camp_roas = camp_df["ROAS"].mean()
-    if camp_roas < 1:
-        with st.container(border=True):
-            st.markdown(f"### Alert details: `{selected_campaign_dd}`")
-            total_spend = camp_df["mark_spent"].sum()
-            total_revenue = camp_df["revenue"].sum()
-            st.write(f"Total spend: €{total_spend:,.0f}")
-            st.write(f"Total revenue: €{total_revenue:,.0f}")
-            st.write(f"ROAS: {camp_roas:.2f} (below target 1.0)")
+    if "selected_campaign" in locals():
+        camp_df = df[df["campaign_name"] == selected_campaign]
+        camp_roas = camp_df["ROAS"].mean()
+        if camp_roas < 1:
+            with st.container(border=True):
+                st.markdown(f"### Alert details: `{selected_campaign}`")
+                total_spend = camp_df["mark_spent"].sum()
+                total_revenue = camp_df["revenue"].sum()
+                st.write(f"Total spend: €{total_spend:,.0f}")
+                st.write(f"Total revenue: €{total_revenue:,.0f}")
+                st.write(f"ROAS: {camp_roas:.2f} (below target 1.0)")
 
-# ===================
-# 4) Action log – simple table
-# ===================
+# ============ 4) ACTION LOG ============
 st.markdown("---")
 st.subheader("Action log (simulation)")
 
