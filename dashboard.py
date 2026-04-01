@@ -10,31 +10,25 @@ if "action_log" not in st.session_state:
 
 st.subheader("Live marketing data (simulation)")
 
-EXCEL_FILE = "live_marketing_data.xlsx"   # exact file name in your folder [image:320]
+EXCEL_FILE = "live_marketing_data.xlsx"
 
-# Always read the live Excel file
-df = pd.read_excel(EXCEL_FILE)  # [web:291]
+df = pd.read_excel(EXCEL_FILE)
 
-# Drop completely empty campaign rows
 if "campaign_name" in df.columns:
     df = df.dropna(subset=["campaign_name"])
 
-# Make sure c_date is a proper date
 if "c_date" in df.columns:
     df["c_date"] = pd.to_datetime(df["c_date"])
 
-# Add status column if missing – default ACTIVE
 if "status" not in df.columns:
     df["status"] = "ACTIVE"
 
-# Compute ROAS and CPA if columns exist
 if "revenue" in df.columns and "mark_spent" in df.columns:
     df["ROAS"] = df["revenue"] / df["mark_spent"]
 
 if "mark_spent" in df.columns and "orders" in df.columns:
     df["CPA"] = df["mark_spent"] / df["orders"]
 
-# Recommendation logic
 def recommend_action(roas):
     if pd.isna(roas):
         return "No data"
@@ -48,13 +42,10 @@ def recommend_action(roas):
 if "ROAS" in df.columns:
     df["recommended_action"] = df["ROAS"].apply(recommend_action)
 
-# Sort by date
 if "c_date" in df.columns and not df.empty:
     df = df.sort_values("c_date")
 
-# ==========================
 # 1) ROAS alerts
-# ==========================
 st.subheader("ROAS alerts")
 
 if "ROAS" in df.columns:
@@ -63,16 +54,6 @@ if "ROAS" in df.columns:
     if base_df.empty:
         st.write("No rows yet (waiting for data in live_marketing_data.xlsx).")
     else:
-        def roas_color(val):
-            if pd.isna(val):
-                return ""
-            if val < 1:
-                return "background-color: #ffcccc"
-            elif val < 2:
-                return "background-color: #fff3cd"
-            else:
-                return "background-color: #d4edda"
-
         view_cols = [
             "campaign_name",
             "category",
@@ -83,15 +64,15 @@ if "ROAS" in df.columns:
             "status",
         ]
         view_cols = [c for c in view_cols if c in base_df.columns]
-        view_df = base_df[view_cols]
+        view_df = base_df[view_cols].copy()
 
         view_df["Pause"] = False
         view_df["Reduce_50"] = False
 
         st.write("Campaigns (scroll inside the table):")
-        styled_view = view_df.style.applymap(roas_color, subset=["ROAS"])
+
         edited_df = st.data_editor(
-            styled_view,
+            view_df,
             height=400,
             column_config={
                 "ROAS": st.column_config.NumberColumn("ROAS", format="%.3f"),
@@ -132,23 +113,18 @@ if "ROAS" in df.columns:
                         {"campaign": name, "action": "reduce_budget_50"}
                     )
 
-            # Save changes back into the same Excel file
-            df.to_excel(EXCEL_FILE, index=False)  # [web:291]
-
+            df.to_excel(EXCEL_FILE, index=False)
             st.success("Actions applied (simulation).")
 else:
     st.write("ROAS column not found. Make sure revenue and mark_spent exist.")
 
-# ===================
 # 2) Campaign drill-down
-# ===================
 st.subheader("Campaign drill-down")
 
 if "campaign_name" in df.columns and not df.empty:
     campaign_list = df["campaign_name"].dropna().astype(str).unique()
     selected_campaign = st.selectbox(
-        "Choose a campaign to inspect:",
-        sorted(campaign_list)
+        "Choose a campaign to inspect:", sorted(campaign_list)
     )
 
     camp_df = df[df["campaign_name"] == selected_campaign]
@@ -172,9 +148,7 @@ if "campaign_name" in df.columns and not df.empty:
         trend = camp_df.sort_values("c_date").set_index("c_date")["ROAS"]
         st.line_chart(trend)
 
-# ===================
 # 3) Alert detail popup (simulation)
-# ===================
 st.markdown("---")
 st.subheader("Alert detail popup (simulation)")
 
@@ -191,9 +165,7 @@ if "ROAS" in df.columns and "campaign_name" in df.columns and not df.empty:
                 st.write(f"Total revenue: €{total_revenue:,.0f}")
                 st.write(f"ROAS: {camp_roas:.2f} (below target 1.0)")
 
-# ===================
-# 4) Action log – simple table
-# ===================
+# 4) Action log
 st.markdown("---")
 st.subheader("Action log (simulation)")
 
