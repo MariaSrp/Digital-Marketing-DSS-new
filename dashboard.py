@@ -4,18 +4,18 @@ import pandas as pd
 st.set_page_config(page_title="Digital Marketing DSS", layout="wide")
 st.title("Digital Marketing DSS")
 
-# --- Session state for action log ---
+# Session state for action log
 if "action_log" not in st.session_state:
     st.session_state["action_log"] = []
 
-st.subheader("Live marketing data (simulation)")
+st.subheader("Live marketing data")
 
 EXCEL_FILE = "live_marketing_data.xlsx"
 
-# ============ LOAD DATA ============
+# LOAD DATA 
 df = pd.read_excel(EXCEL_FILE)
 
-# ============ CLEANING & KPIs ============
+# CLEANING & KPIs 
 if "campaign_name" in df.columns:
     df = df.dropna(subset=["campaign_name"])
 
@@ -47,8 +47,8 @@ if "ROAS" in df.columns:
 if "c_date" in df.columns and not df.empty:
     df = df.sort_values("c_date")
 
-# ============ 1) ONE TABLE: ROAS + CHECKBOXES ============
-st.subheader("ROAS alerts (one table)")
+# TABLE: ROAS + CHECKBOXES 
+st.subheader("ROAS alerts")
 
 if "ROAS" in df.columns and not df.empty:
     base_df = df.copy().sort_values("ROAS")
@@ -69,7 +69,7 @@ if "ROAS" in df.columns and not df.empty:
     view_df["Pause"] = False
     view_df["Reduce_50"] = False
 
-    # Style ROAS colors - ROAS will be disabled (read-only) in editor
+    # Style ROAS colors 
     def roas_color(val):
         if pd.isna(val):
             return ""
@@ -128,7 +128,7 @@ if "ROAS" in df.columns and not df.empty:
 else:
     st.write("ROAS column not found or no rows. Check revenue and mark_spent.")
 
-# ============ 2) DRILL-DOWN ============
+# DRILL-DOWN 
 st.subheader("Campaign drill-down")
 
 if "campaign_name" in df.columns and not df.empty:
@@ -157,9 +157,9 @@ if "campaign_name" in df.columns and not df.empty:
         trend = camp_df.sort_values("c_date").set_index("c_date")["ROAS"]
         st.line_chart(trend)
 
-# ============ 3) ALERT DETAIL POPUP (OPTIONAL) ============
+# ALERT DETAIL POPUP
 st.markdown("---")
-st.subheader("Alert detail popup (simulation)")
+st.subheader("Alert detail popup")
 
 if "ROAS" in df.columns and "campaign_name" in df.columns and not df.empty:
     if "selected_campaign" in locals():
@@ -174,9 +174,9 @@ if "ROAS" in df.columns and "campaign_name" in df.columns and not df.empty:
                 st.write(f"Total revenue: €{total_revenue:,.0f}")
                 st.write(f"ROAS: {camp_roas:.2f} (below target 1.0)")
 
-# ============ 4) ACTION LOG ============
+# ACTION LOG 
 st.markdown("---")
-st.subheader("Action log (simulation)")
+st.subheader("Action log")
 
 if st.session_state["action_log"]:
     log_df = pd.DataFrame(st.session_state["action_log"])
