@@ -23,7 +23,7 @@ def main():
         next_row.to_csv(LIVE_FILE, mode="a", header=False, index=False)
         print(f"Appended row {start_idx}")
         start_idx += 1
-        time.sleep(INTERVAL_SECONDS)
+       
 
 if __name__ == "__main__":
     main()
