@@ -3,7 +3,7 @@ import pandas as pd
 
 SOURCE_FILE = "source_data.csv"
 LIVE_FILE = "live_marketing_data.csv"
-INTERVAL_SECONDS = 15  # seconds between new rows
+
 
 def main():
     # Read full source data
